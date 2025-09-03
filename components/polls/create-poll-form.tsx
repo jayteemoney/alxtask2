@@ -24,11 +24,11 @@ const createPollSchema = z.object({
   title: z.string().min(1, "Title is required").max(200, "Title too long"),
   description: z.string().optional(),
   options: z
-    .array(z.string().min(1, "Option cannot be empty"))
+    .array(z.object({ value: z.string().min(1, "Option cannot be empty") }))
     .min(2, "At least 2 options required"),
-  allowMultipleVotes: z.boolean().default(false),
+  allowMultipleVotes: z.boolean(),
   expiresAt: z.string().optional(),
-  isPublic: z.boolean().default(true),
+  isPublic: z.boolean(),
 });
 
 type CreatePollFormData = z.infer<typeof createPollSchema>;
@@ -43,13 +43,13 @@ export function CreatePollForm() {
     defaultValues: {
       title: "",
       description: "",
-      options: ["", ""],
+      options: [{ value: "" }, { value: "" }],
       allowMultipleVotes: false,
       isPublic: true,
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove } = useFieldArray<CreatePollFormData>({
     control: form.control,
     name: "options",
   });
@@ -65,7 +65,7 @@ export function CreatePollForm() {
         body: JSON.stringify({
           title: data.title,
           description: data.description || null,
-          options: data.options.filter((option) => option.trim() !== ""),
+          options: data.options.map((option) => option.value).filter((option) => option.trim() !== ""),
           allow_multiple_votes: data.allowMultipleVotes,
           expires_at: data.expiresAt || null,
           is_public: data.isPublic,
@@ -91,7 +91,7 @@ export function CreatePollForm() {
   }
 
   const addOption = () => {
-    append("");
+    append({ value: "" });
   };
 
   const removeOption = (index: number) => {
@@ -146,7 +146,7 @@ export function CreatePollForm() {
             <div key={field.id} className="flex gap-2">
               <FormField
                 control={form.control}
-                name={`options.${index}`}
+                name={`options.${index}.value`}
                 render={({ field }) => (
                   <FormItem className="flex-1">
                     <FormControl>
