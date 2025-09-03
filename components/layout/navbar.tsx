@@ -66,7 +66,7 @@ export function Navbar() {
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2 hover-glow">
             <Vote className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold text-primary">ALX Polly</span>
+            <span className="text-xl font-bold text-primary">polling App</span>
           </Link>
 
           {/* Desktop Navigation */}
