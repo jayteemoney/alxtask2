@@ -1,198 +1,192 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { Menu, X, Vote, Plus, BarChart3, User, LogOut } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { type User } from "@supabase/supabase-js";
+import { LogOut, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/shared/theme-toggle";
-import { useAuth } from "@/contexts/auth-context";
-import { createClient } from "@/lib/supabase/browser-client";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 
-export function Navbar() {
-  const [isOpen, setIsOpen] = useState(false);
-  const { user, loading } = useAuth();
+const Logo = () => (
+  <Link href="/" className="flex items-center font-semibold text-lg">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="mr-2 h-6 w-6"
+    >
+      <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+    </svg>
+    Polling App
+  </Link>
+);
+
+interface NavLinkProps {
+  href: string;
+  children: React.ReactNode;
+  onClick?: () => void;
+  className?: string;
+}
+
+const NavLink = ({ href, children, onClick, className }: NavLinkProps) => (
+  <Link
+    href={href}
+    onClick={onClick}
+    className={cn(
+      "text-sm font-medium text-muted-foreground transition-colors hover:text-primary",
+      className
+    )}
+  >
+    {children}
+  </Link>
+);
+
+const UserAvatar = ({ user }: { user: User }) => {
+  const fallback = useMemo(
+    () => user?.email?.charAt(0).toUpperCase() ?? "U",
+    [user]
+  );
+
+  return (
+    <Avatar className="h-8 w-8">
+      <AvatarImage src={user.user_metadata.avatar_url} alt={user.email} />
+      <AvatarFallback>{fallback}</AvatarFallback>
+    </Avatar>
+  );
+};
+
+const AuthButton = ({ user }: { user: User | null }) => {
   const supabase = createClient();
 
-  const isLoggedIn = !!user;
-  const userName = user?.user_metadata?.full_name || user?.email || "User";
+  const handleSignOut = useCallback(async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/";
+  }, [supabase.auth]);
 
-  const toggleMenu = () => setIsOpen(!isOpen);
-
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      setIsOpen(false);
-    } catch (error) {
-      console.error("Error signing out:", error);
-    }
-  };
-
-  const loggedOutItems = [{ href: "/", label: "Home", icon: Vote }];
-
-  const loggedInItems = [
-    { href: "/dashboard", label: "My Polls", icon: BarChart3 },
-    { href: "/polls/create", label: "Create Poll", icon: Plus },
-  ];
-
-  const navItems = isLoggedIn ? loggedInItems : loggedOutItems;
-
-  if (loading) {
+  if (user) {
     return (
-      <nav className="bg-background/95 border-b backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center space-x-2">
-              <Vote className="h-8 w-8 text-primary" />
-              <span className="text-xl font-bold text-primary">ALX Polly</span>
-            </Link>
-            <div className="hidden md:flex items-center space-x-6">
-              <ThemeToggle />
-              <div className="h-8 w-24 bg-muted animate-pulse rounded"></div>
-            </div>
-            <div className="md:hidden">
-              <div className="h-6 w-6 bg-muted animate-pulse rounded"></div>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+            <UserAvatar user={user} />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-56" align="end" forceMount>
+          <DropdownMenuItem disabled>{user.email}</DropdownMenuItem>
+          <DropdownMenuItem onClick={handleSignOut}>
+            <LogOut className="mr-2 h-4 w-4" />
+            <span>Log out</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     );
   }
 
   return (
-    <nav className="bg-background/95 border-b backdrop-blur-sm sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2 hover-glow">
-            <Vote className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold text-primary">polling App</span>
-          </Link>
+    <Button asChild>
+      <Link href="/login">Login</Link>
+    </Button>
+  );
+};
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-6">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="flex items-center space-x-2 text-foreground hover:text-primary transition-colors-smooth"
-                >
-                  <Icon className="h-4 w-4" />
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
+export default function Navbar() {
+  const [user, setUser] = useState<User | null>(null);
+  const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const supabase = createClient();
 
-            {/* Theme Toggle */}
-            <ThemeToggle />
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
 
-            {/* Auth Buttons or User Info */}
-            {isLoggedIn ? (
-              <div className="flex items-center space-x-3">
-                <div className="flex items-center space-x-2 text-foreground">
-                  <User className="h-4 w-4" />
-                  <span className="text-sm font-medium">{userName}</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  className="transition-colors-smooth hover-lift"
-                  onClick={handleLogout}
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Logout
-                </Button>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-3">
-                <Button
-                  asChild
-                  className="hover-glow transition-smooth gradient-primary"
-                >
-                  <Link href="/register">Get Started</Link>
-                </Button>
-              </div>
-            )}
-          </div>
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+    });
 
-          {/* Mobile menu button */}
-          <div className="md:hidden">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleMenu}
-              className="text-foreground hover:text-primary"
-            >
-              {isOpen ? (
-                <X className="h-6 w-6" />
-              ) : (
-                <Menu className="h-6 w-6" />
-              )}
-            </Button>
-          </div>
+    return () => subscription.unsubscribe();
+  }, [supabase.auth]);
+
+  const toggleMobileMenu = useCallback(() => {
+    setMobileMenuOpen((prev) => !prev);
+  }, []);
+
+  const closeMobileMenu = useCallback(() => {
+    setMobileMenuOpen(false);
+  }, []);
+
+  const navLinks = useMemo(
+    () => [
+      { href: "/about", label: "About" },
+      { href: "/pricing", label: "Pricing" },
+      { href: "/contact", label: "Contact" },
+    ],
+    []
+  );
+
+  return (
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-14 items-center">
+        <div className="mr-4 hidden md:flex">
+          <Logo />
         </div>
 
-        {/* Mobile Navigation */}
-        <div
-          className={cn(
-            "md:hidden transition-all duration-300 ease-in-out overflow-hidden",
-            isOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
-          )}
-        >
-          <div className="py-4 space-y-2">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setIsOpen(false)}
-                  className="flex items-center space-x-3 px-4 py-3 rounded-lg text-foreground hover:bg-secondary/50 transition-colors-smooth"
+        {/* Mobile Menu Button */}
+        <div className="md:hidden">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleMobileMenu}
+            aria-label="Toggle menu"
+          >
+            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </Button>
+        </div>
+
+        {/* Mobile Menu */}
+        {isMobileMenuOpen && (
+          <div className="absolute top-full left-0 w-full bg-background shadow-md md:hidden">
+            <nav className="grid items-start px-4 text-sm font-medium">
+              {navLinks.map((link) => (
+                <NavLink
+                  key={link.href}
+                  href={link.href}
+                  onClick={closeMobileMenu}
+                  className="py-2"
                 >
-                  <Icon className="h-5 w-5" />
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-
-            {/* Mobile Theme Toggle and Auth */}
-            <div className="px-4 py-3 space-y-3 border-t border-border mt-4 pt-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Theme</span>
-                <ThemeToggle />
-              </div>
-
-              {isLoggedIn ? (
-                <div className="flex flex-col space-y-2">
-                  <div className="flex items-center space-x-2 px-3 py-2 text-foreground">
-                    <User className="h-4 w-4" />
-                    <span className="text-sm font-medium">{userName}</span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    className="justify-start transition-colors-smooth hover-lift"
-                    onClick={handleLogout}
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Logout
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex flex-col space-y-2">
-                  <Button
-                    asChild
-                    className="justify-start hover-glow transition-smooth gradient-primary"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <Link href="/register">Get Started</Link>
-                  </Button>
-                </div>
-              )}
-            </div>
+                  {link.label}
+                </NavLink>
+              ))}
+            </nav>
           </div>
+        )}
+
+        {/* Desktop Navigation */}
+        <nav className="hidden items-center space-x-6 text-sm font-medium md:flex">
+          {navLinks.map((link) => (
+            <NavLink key={link.href} href={link.href}>
+              {link.label}
+            </NavLink>
+          ))}
+        </nav>
+
+        <div className="flex flex-1 items-center justify-end space-x-4">
+          <AuthButton user={user} />
         </div>
       </div>
-    </nav>
+    </header>
   );
 }
