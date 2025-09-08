@@ -67,13 +67,68 @@ const UserAvatar = ({ user }: { user: User }) => {
   );
 };
 
+const MobileMenu = ({
+  isOpen,
+  onToggle,
+  onClose,
+  navLinks,
+}: {
+  isOpen: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  navLinks: Array<{ href: string; label: string }>;
+}) => (
+  <>
+    <div className="md:hidden">
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onToggle}
+        aria-label="Toggle menu"
+      >
+        {isOpen ? <X size={24} /> : <Menu size={24} />}
+      </Button>
+    </div>
+    {isOpen && (
+      <div className="absolute top-full left-0 w-full bg-background shadow-md md:hidden">
+        <nav className="grid items-start px-4 text-sm font-medium">
+          {navLinks.map((link) => (
+            <NavLink
+              key={link.href}
+              href={link.href}
+              onClick={onClose}
+              className="py-2"
+            >
+              {link.label}
+            </NavLink>
+          ))}
+        </nav>
+      </div>
+    )}
+  </>
+);
+
+const DesktopNav = ({
+  navLinks,
+}: {
+  navLinks: Array<{ href: string; label: string }>;
+}) => (
+  <nav className="hidden items-center space-x-6 text-sm font-medium md:flex">
+    {navLinks.map((link) => (
+      <NavLink key={link.href} href={link.href}>
+        {link.label}
+      </NavLink>
+    ))}
+  </nav>
+);
+
 const AuthButton = ({ user }: { user: User | null }) => {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const handleSignOut = useCallback(async () => {
     await supabase.auth.signOut();
     window.location.href = "/";
-  }, [supabase.auth]);
+  }, [supabase]);
 
   if (user) {
     return (
@@ -104,7 +159,7 @@ const AuthButton = ({ user }: { user: User | null }) => {
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     const {
@@ -118,7 +173,7 @@ export default function Navbar() {
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase.auth]);
+  }, [supabase]);
 
   const toggleMobileMenu = useCallback(() => {
     setMobileMenuOpen((prev) => !prev);
@@ -144,44 +199,14 @@ export default function Navbar() {
           <Logo />
         </div>
 
-        {/* Mobile Menu Button */}
-        <div className="md:hidden">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleMobileMenu}
-            aria-label="Toggle menu"
-          >
-            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </Button>
-        </div>
+        <MobileMenu
+          isOpen={isMobileMenuOpen}
+          onToggle={toggleMobileMenu}
+          onClose={closeMobileMenu}
+          navLinks={navLinks}
+        />
 
-        {/* Mobile Menu */}
-        {isMobileMenuOpen && (
-          <div className="absolute top-full left-0 w-full bg-background shadow-md md:hidden">
-            <nav className="grid items-start px-4 text-sm font-medium">
-              {navLinks.map((link) => (
-                <NavLink
-                  key={link.href}
-                  href={link.href}
-                  onClick={closeMobileMenu}
-                  className="py-2"
-                >
-                  {link.label}
-                </NavLink>
-              ))}
-            </nav>
-          </div>
-        )}
-
-        {/* Desktop Navigation */}
-        <nav className="hidden items-center space-x-6 text-sm font-medium md:flex">
-          {navLinks.map((link) => (
-            <NavLink key={link.href} href={link.href}>
-              {link.label}
-            </NavLink>
-          ))}
-        </nav>
+        <DesktopNav navLinks={navLinks} />
 
         <div className="flex flex-1 items-center justify-end space-x-4">
           <AuthButton user={user} />
